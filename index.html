@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Growth Chart Plotter</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <!-- pdf.js multi-CDN fallback loader -->
+  <script>
+    (function(){
+      const version = '4.2.67';
+      const localPath = 'node_modules/pdfjs-dist/build/pdf.min.js';
+      const localWorker = 'node_modules/pdfjs-dist/build/pdf.worker.min.js';
+      const coreFiles = [localPath,
+        `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.min.js`,
+        `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.min.js`,
+        `https://unpkg.com/pdfjs-dist@${version}/build/pdf.min.js`
+      ];
+      const workerFiles = [localWorker,
+        `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`,
+        `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.js`,
+        `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.min.js`
+      ];
+      let idx = 0;
+      function finishFailure(){
+        const fail = document.getElementById('pdfjs-fail');
+        if(fail) fail.classList.remove('hidden');
+      }
+      function tryLoad(){
+        if(idx >= coreFiles.length){
+          finishFailure();
+          return;
+        }
+        const s = document.createElement('script');
+        s.src = coreFiles[idx];
+        s.onload = function(){
+          if(window.pdfjsLib){
+            const workerSrc = workerFiles[idx] || workerFiles[0];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+          } else {
+            idx++; tryLoad();
+          }
+        };
+        s.onerror = function(){ idx++; tryLoad(); };
+        document.head.appendChild(s);
+      }
+      tryLoad();
+    })();
+  </script>
+</head>
+<body>
+  <header>
+    <h1>Growth Chart Plotter</h1>
+    <p class="tagline">Overlay a child's anthropometric measurements on CDC/WHO PDF growth charts (local).</p>
+  <div id="pdfjs-fail" class="notice hidden" style="margin-top:4px">pdf.js failed to load from all sources. If offline, install locally (<code>npm install pdfjs-dist</code>) and open via a local server. On GitHub Pages ensure no corporate firewall blocks CDN domains.</div>
+  </header>
+
+  <main>
+    <section class="panel inputs">
+      <form id="measureForm" autocomplete="off">
+        <fieldset>
+          <legend>Child Info</legend>
+          <label>Sex
+            <select id="sex" required>
+              <option value="boys">Boy</option>
+              <option value="girls">Girl</option>
+            </select>
+          </label>
+          <div class="age-grid">
+            <label>Age Years <input id="ageYears" type="number" min="0" value="2" /></label>
+            <label>Months <input id="ageMonths" type="number" min="0" max="11" value="0" /></label>
+            <label>Days <input id="ageDays" type="number" min="0" max="30" value="0" /></label>
+          </div>
+          <label>Weight (kg) <input id="weight" type="number" min="0" step="0.01" required /></label>
+          <label>Height/Length (cm) <input id="height" type="number" min="0" step="0.1" required /></label>
+          <label>Head Circumference (cm) <input id="hc" type="number" min="0" step="0.1" /></label>
+        </fieldset>
+        <fieldset>
+          <legend>Chart / Metric</legend>
+          <label><input type="checkbox" name="metric" value="weightForAge" checked /> Weight-for-Age</label>
+          <label><input type="checkbox" name="metric" value="statureForAge" checked /> Height/Length-for-Age</label>
+          <label><input type="checkbox" name="metric" value="weightForStature" /> Weight-for-Height/Length</label>
+          <label><input type="checkbox" name="metric" value="headCircumference" /> Head Circumference</label>
+        </fieldset>
+        <div class="actions">
+          <button type="submit" class="primary">Plot Points</button>
+          <button type="button" id="clearPoints">Clear Points</button>
+          <button type="button" id="enterCalibrateMode">Calibrate Axes</button>
+        </div>
+      </form>
+      <details class="help">
+        <summary>How this works</summary>
+        <p>
+          The PDFs in this folder are rendered with PDF.js and a transparent canvas overlay is used to plot points.
+          To achieve accurate placement you must calibrate each PDF once: supply numerical min/max for X and Y axes
+          and click the corresponding positions on the chart. Calibration is stored in your browser's localStorage.
+        </p>
+        <ol>
+          <li>Select a metric and sex, click Calibrate Axes.</li>
+          <li>Enter numeric min/max for X (e.g. age months 0 and 36) & Y (e.g. head circumference 30 and 54).</li>
+          <li>Click the canvas where X min/Y min (origin) is. Then click the location for X max. Then click Y max.</li>
+          <li>Save calibration. Now plotting will map values linearly.</li>
+        </ol>
+        <p>Percentiles require LMS data (not bundled fully here). A small demo set is implemented; extend with full CDC/WHO tables in <code>lmsData.js</code>.</p>
+      </details>
+    </section>
+
+    <section class="panel viewer">
+      <div class="chart-tabs" id="chartTabs"></div>
+      <div id="pdfViewportContainer"></div>
+      <div id="calibrationPanel" class="hidden"></div>
+    </section>
+
+    <section class="panel results">
+      <h2>Results</h2>
+      <table id="resultsTable">
+        <thead>
+          <tr><th>Metric</th><th>Value</th><th>Age (months)</th><th>Percentile</th><th>Z</th><th>Chart</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>
+    <small>Local-only tool. Ensure you have rights to use provided growth charts. LMS sample data for demonstration; validate clinically before use.</small>
+  </footer>
+
+  <script src="lmsData.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

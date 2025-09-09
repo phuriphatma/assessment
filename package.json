@@ -1,0 +1,14 @@
+{
+  "name": "growth-chart-plotter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local static tool to overlay child growth measurements on PDF charts.",
+  "scripts": {
+    "install-pdfjs": "npm install pdfjs-dist",
+    "serve": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^4.2.67"
+  }
+}
