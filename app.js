@@ -90,6 +90,15 @@ const chartTabsEl = document.getElementById('chartTabs');
 let currentPdf = null; // { pdfFile, pages:[ { canvas, overlay, page } ] }
 let activeMetricTabs = [];
 let calibrateState = null; // { step, metric, sex, pdfFile, temp: {axisValues, pointsCollected} }
+// Suggested default axis ranges
+const DEFAULT_AXIS = {
+  headCircumference: { xmin:0, xmax:36, ymin:30, ymax:55 },
+  weightForAge_under2: { xmin:0, xmax:24, ymin:2, ymax:16 },
+  weightForAge_2to19: { xmin:24, xmax:240, ymin:10, ymax:100 },
+  statureForAge_under2: { xmin:0, xmax:24, ymin:45, ymax:100 },
+  statureForAge_2to19: { xmin:24, xmax:240, ymin:75, ymax:190 },
+  weightForStature: { xmin:65, xmax:120, ymin:5, ymax:30 }
+};
 
 function ageToMonths(years, months, days){
   return years*12 + months + days/30.4375; // average length of month
@@ -170,11 +179,15 @@ function mapValueToCanvas(metric, sex, pdfFile, xValue, yValue){
   if(!cal) return null;
   const { axis, points } = cal;
   const { origin, xMax, yMax } = points;
-  // Determine scale factors
-  const pxPerX = (xMax.x - origin.x) / (axis.xmax - axis.xmin);
-  const pxPerY = (yMax.y - origin.y) / (axis.ymax - axis.ymin); // positive downward
-  const cx = origin.x + (xValue - axis.xmin)*pxPerX;
-  const cy = origin.y + (yValue - axis.ymin)*pxPerY;
+  // Determine scale factors with orientation handling
+  const xSpan = axis.xmax - axis.xmin || 1;
+  const ySpan = axis.ymax - axis.ymin || 1;
+  const xDir = (xMax.x >= origin.x)? 1 : -1;
+  const yDir = (yMax.y >= origin.y)? 1 : -1; // charts usually have y decreasing upward => yMax likely above origin giving yDir = -1
+  const pxPerX = Math.abs(xMax.x - origin.x) / xSpan;
+  const pxPerY = Math.abs(yMax.y - origin.y) / ySpan;
+  const cx = origin.x + (xValue - axis.xmin)*pxPerX*xDir;
+  const cy = origin.y + (yValue - axis.ymin)*pxPerY*yDir;
   return { x: cx, y: cy };
 }
 
@@ -253,6 +266,11 @@ function startCalibration(metric, sex, pdfFile){
 function showCalibrationPanel(){
   calibrationPanel.classList.remove('hidden');
   const cal = calibrateState;
+  let defaults = null;
+  if(cal.metric === 'headCircumference') defaults = DEFAULT_AXIS.headCircumference;
+  else if(cal.metric === 'weightForAge') defaults = /0-2/.test(cal.pdfFile)? DEFAULT_AXIS.weightForAge_under2 : DEFAULT_AXIS.weightForAge_2to19;
+  else if(cal.metric === 'statureForAge') defaults = /0-2/.test(cal.pdfFile)? DEFAULT_AXIS.statureForAge_under2 : DEFAULT_AXIS.statureForAge_2to19;
+  else if(cal.metric === 'weightForStature') defaults = DEFAULT_AXIS.weightForStature;
   const axisForm = `<div class='calibration-axis-form'>
     <div style='display:flex;gap:0.5rem;flex-wrap:wrap'>
       <label style='flex:1'>X Min<input id='cal_xmin' type='number' step='0.01' /></label>
@@ -261,8 +279,17 @@ function showCalibrationPanel(){
       <label style='flex:1'>Y Max<input id='cal_ymax' type='number' step='0.01' /></label>
     </div>
     <button type='button' id='calSetAxis'>Set Axis Values</button>
+    <button type='button' id='calCancel' style='margin-left:0.5rem'>Cancel</button>
   </div>`;
-  calibrationPanel.innerHTML = `<strong>Calibration: ${cal.metric} (${cal.sex}) on ${cal.pdfFile}</strong><div class='notice'>1. Enter axis numeric ranges. 2. Click origin (Xmin,Ymin). 3. Click Xmax. 4. Click Ymax.</div>${axisForm}<div id='calibrationSteps'></div>`;
+  calibrationPanel.innerHTML = `<strong>Calibration: ${cal.metric} (${cal.sex}) on ${cal.pdfFile}</strong><div class='notice'>1. Enter axis numeric ranges (defaults inserted if available). 2. Click origin (Xmin,Ymin). 3. Click Xmax (same Y). 4. Click Ymax (same X as origin).</div>${axisForm}<div id='calibrationSteps'></div>`;
+  if(defaults){
+    setTimeout(()=>{
+      document.getElementById('cal_xmin').value = defaults.xmin;
+      document.getElementById('cal_xmax').value = defaults.xmax;
+      document.getElementById('cal_ymin').value = defaults.ymin;
+      document.getElementById('cal_ymax').value = defaults.ymax;
+    },0);
+  }
   document.getElementById('calSetAxis').onclick = ()=>{
     const xmin = parseFloat(document.getElementById('cal_xmin').value);
     const xmax = parseFloat(document.getElementById('cal_xmax').value);
@@ -272,6 +299,11 @@ function showCalibrationPanel(){
     calibrateState.temp.axisValues = { xmin,xmax,ymin,ymax };
     setCalibrationOverlayMode(true);
     renderCalibrationSteps();
+  };
+  document.getElementById('calCancel').onclick = ()=>{
+    setCalibrationOverlayMode(false);
+    calibrationPanel.classList.add('hidden');
+    calibrateState = null;
   };
   renderCalibrationSteps();
 }
@@ -292,12 +324,24 @@ function calibrationClickHandler(e){
   const x = e.clientX - rect.left; const y = e.clientY - rect.top;
   if(calibrateState.step === 0){
     calibrateState.temp.pointsCollected.origin = { x, y };
+    addCalibrationMarker(x,y,'O');
     calibrateState.step = 1;
   } else if(calibrateState.step === 1){
     calibrateState.temp.pointsCollected.xMax = { x, y };
+    addCalibrationMarker(x,y,'X');
     calibrateState.step = 2;
   } else if(calibrateState.step === 2){
     calibrateState.temp.pointsCollected.yMax = { x, y };
+    addCalibrationMarker(x,y,'Y');
+    const pts = calibrateState.temp.pointsCollected;
+    if(pts.xMax.x === pts.origin.x){
+      alert('Xmax must differ in X from origin. Restarting step.');
+      delete pts.xMax; delete pts.yMax; calibrateState.step = 1; redrawCalMarkers(); renderCalibrationSteps(); return;
+    }
+    if(pts.yMax.y === pts.origin.y){
+      alert('Ymax must differ in Y from origin. Restarting step.');
+      delete pts.yMax; calibrateState.step = 2; redrawCalMarkers(); renderCalibrationSteps(); return;
+    }
     // Save calibration
     setCalibration(calibrateState.metric, calibrateState.sex, calibrateState.pdfFile, {
       pdfFile: calibrateState.pdfFile,
@@ -311,6 +355,34 @@ function calibrationClickHandler(e){
     calibrateState = null;
   }
   renderCalibrationSteps();
+}
+
+function addCalibrationMarker(x,y,label){
+  if(!currentPdf) return;
+  const mark = document.createElement('div');
+  mark.className = 'cal-marker';
+  mark.style.position='absolute';
+  mark.style.transform='translate(-50%,-50%)';
+  mark.style.background='#1f6feb';
+  mark.style.color='#fff';
+  mark.style.fontSize='10px';
+  mark.style.padding='2px 3px';
+  mark.style.borderRadius='3px';
+  mark.style.left = x+'px';
+  mark.style.top = y+'px';
+  mark.textContent = label;
+  currentPdf.pages[0].overlay.appendChild(mark);
+}
+
+function redrawCalMarkers(){
+  if(!currentPdf) return;
+  const overlay = currentPdf.pages[0].overlay;
+  Array.from(overlay.querySelectorAll('.cal-marker')).forEach(el=>el.remove());
+  if(!calibrateState) return;
+  const pts = calibrateState.temp.pointsCollected;
+  if(pts.origin) addCalibrationMarker(pts.origin.x, pts.origin.y,'O');
+  if(pts.xMax) addCalibrationMarker(pts.xMax.x, pts.xMax.y,'X');
+  if(pts.yMax) addCalibrationMarker(pts.yMax.x, pts.yMax.y,'Y');
 }
 
 function renderCalibrationSteps(){
