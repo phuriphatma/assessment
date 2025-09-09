@@ -41,6 +41,50 @@ function setCalibration(metric, sex, pdfFile, data){
 }
 
 // PDF rendering
+let pdfjsLoadPromise = null;
+function ensurePdfjsLoaded(){
+  if(typeof pdfjsLib !== 'undefined') return Promise.resolve();
+  if(pdfjsLoadPromise) return pdfjsLoadPromise;
+  const localModulePath = './pdfjs/pdf.mjs';
+  const localWorkerPath = './pdfjs/pdf.worker.mjs';
+  const cdnVersion = '4.2.67';
+  const cdnCore = [
+    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${cdnVersion}/pdf.min.js`,
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${cdnVersion}/build/pdf.min.js`,
+    `https://unpkg.com/pdfjs-dist@${cdnVersion}/build/pdf.min.js`
+  ];
+  const cdnWorkers = [
+    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${cdnVersion}/pdf.worker.min.js`,
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${cdnVersion}/build/pdf.worker.min.js`,
+    `https://unpkg.com/pdfjs-dist@${cdnVersion}/build/pdf.worker.min.js`
+  ];
+  pdfjsLoadPromise = (async ()=>{
+    // Try local ESM first
+    try {
+      const mod = await import(localModulePath);
+      if(mod && (mod.getDocument || mod.GlobalWorkerOptions)){
+        window.pdfjsLib = mod;
+        if(!pdfjsLib.GlobalWorkerOptions) pdfjsLib.GlobalWorkerOptions = { workerSrc: localWorkerPath }; else pdfjsLib.GlobalWorkerOptions.workerSrc = localWorkerPath;
+        return;
+      }
+    } catch(_) { /* ignore */ }
+    // Fallback to CDN sequential loading
+    for(let i=0;i<cdnCore.length;i++){
+      try {
+        await new Promise((resolve,reject)=>{
+          const s = document.createElement('script');
+            s.src = cdnCore[i];
+            s.onload = ()=>{ if(window.pdfjsLib){ try{ pdfjsLib.GlobalWorkerOptions.workerSrc = cdnWorkers[i]; }catch(_){} resolve(); } else reject(new Error('No global pdfjsLib after load')); };
+            s.onerror = ()=> reject(new Error('Failed '+cdnCore[i]));
+            document.head.appendChild(s);
+        });
+        if(typeof pdfjsLib !== 'undefined') return;
+      } catch(e){ /* try next */ }
+    }
+    throw new Error('pdf.js failed to load from local or CDN');
+  })();
+  return pdfjsLoadPromise;
+}
 const pdfViewportContainer = document.getElementById('pdfViewportContainer');
 const chartTabsEl = document.getElementById('chartTabs');
 let currentPdf = null; // { pdfFile, pages:[ { canvas, overlay, page } ] }
@@ -63,15 +107,12 @@ function pickPdfForMetric(metric, sex, ageMonths){
 async function loadPdfIfNeeded(pdfFile){
   if(currentPdf && currentPdf.pdfFile === pdfFile) return currentPdf;
   pdfViewportContainer.innerHTML = '';
-  // Show a loading indicator
   const loadingDiv = document.createElement('div');
   loadingDiv.style.padding = '0.5rem';
   loadingDiv.textContent = `Loading ${pdfFile} ...`;
   pdfViewportContainer.appendChild(loadingDiv);
   try {
-    if(typeof pdfjsLib === 'undefined') {
-      throw new Error('pdfjsLib not loaded (CDN blocked?)');
-    }
+    await ensurePdfjsLoaded();
     const loadingTask = pdfjsLib.getDocument(pdfFile);
     const pdf = await loadingTask.promise;
     const pages = [];
@@ -98,7 +139,7 @@ async function loadPdfIfNeeded(pdfFile){
     return currentPdf;
   } catch(err){
     console.error('PDF load error', err);
-    pdfViewportContainer.innerHTML = `<div class="notice" style="color:#ffa657">Failed to load PDF: ${pdfFile}<br>${err.message}<br>${location.protocol==='file:'? 'If you opened index.html directly (file://), some browsers block XHR to local PDFs. Run a local server instead.' : ''}</div>`;
+    pdfViewportContainer.innerHTML = `<div class=\"notice\" style=\"color:#ffa657\">Failed to load PDF: ${pdfFile}<br>${err.message}</div>`;
     return null;
   }
 }
