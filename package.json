@@ -1,4 +1,5 @@
 {
+  "homepage": "https://phuriphatma.github.io/assessment",
   "name": "growth-chart-plotter",
   "version": "0.1.0",
   "private": true,
@@ -6,9 +7,15 @@
   "scripts": {
     "install-pdfjs": "npm install pdfjs-dist",
     "serve": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "echo 'Static site – no build step'",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d ."
   },
   "dependencies": {
     "pdfjs-dist": "^4.2.67"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.1.1"
   }
 }
