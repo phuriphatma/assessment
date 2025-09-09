@@ -5,48 +5,56 @@
   <title>Growth Chart Plotter</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="styles.css" />
-  <!-- pdf.js multi-CDN fallback loader -->
-  <script>
-    (function(){
-      const version = '4.2.67';
-  // Local build artifacts (created during GitHub Pages workflow) live in pdfjs/
-  const localPath = 'pdfjs/pdf.min.js';
-  const localWorker = 'pdfjs/pdf.worker.min.js';
-      const coreFiles = [localPath,
+  <!-- pdf.js local ESM + CDN fallback loader -->
+  <script type="module">
+    const version = '4.2.67';
+    const localCore = 'pdfjs/pdf.mjs';
+    const localWorker = 'pdfjs/pdf.worker.mjs';
+    let loaded = false;
+    async function loadLocal(){
+      try {
+        const mod = await import('./'+localCore);
+        if(mod && (mod.getDocument || mod.GlobalWorkerOptions)){
+          window.pdfjsLib = mod; // expose to existing code
+          if(!pdfjsLib.GlobalWorkerOptions) pdfjsLib.GlobalWorkerOptions = { workerSrc: localWorker }; else pdfjsLib.GlobalWorkerOptions.workerSrc = localWorker;
+          loaded = true;
+        }
+      } catch(e){ /* local not available */ }
+    }
+    function loadCdn(){
+      if(loaded) return;
+      const cdnCore = [
         `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.min.js`,
         `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.min.js`,
         `https://unpkg.com/pdfjs-dist@${version}/build/pdf.min.js`
       ];
-      const workerFiles = [localWorker,
+      const cdnWorkers = [
         `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.js`,
         `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.js`,
         `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.min.js`
       ];
-      let idx = 0;
-      function finishFailure(){
-        const fail = document.getElementById('pdfjs-fail');
-        if(fail) fail.classList.remove('hidden');
-      }
-      function tryLoad(){
-        if(idx >= coreFiles.length){
-          finishFailure();
+      let i = 0;
+      function attempt(){
+        if(loaded) return;
+        if(i >= cdnCore.length){
+          const fail = document.getElementById('pdfjs-fail');
+          if(fail) fail.classList.remove('hidden');
           return;
         }
         const s = document.createElement('script');
-        s.src = coreFiles[idx];
-        s.onload = function(){
+        s.src = cdnCore[i];
+        s.onload = ()=>{
           if(window.pdfjsLib){
-            const workerSrc = workerFiles[idx] || workerFiles[0];
-            pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
-          } else {
-            idx++; tryLoad();
-          }
+            pdfjsLib.GlobalWorkerOptions.workerSrc = cdnWorkers[i] || cdnWorkers[0];
+            loaded = true;
+          } else { i++; attempt(); }
         };
-        s.onerror = function(){ idx++; tryLoad(); };
+        s.onerror = ()=>{ i++; attempt(); };
         document.head.appendChild(s);
       }
-      tryLoad();
-    })();
+      attempt();
+    }
+    loadLocal().then(()=>{ if(!loaded) loadCdn(); });
   </script>
 </head>
 <body>
