@@ -9,8 +9,9 @@
   <script>
     (function(){
       const version = '4.2.67';
-      const localPath = 'node_modules/pdfjs-dist/build/pdf.min.js';
-      const localWorker = 'node_modules/pdfjs-dist/build/pdf.worker.min.js';
+  // Local build artifacts (created during GitHub Pages workflow) live in pdfjs/
+  const localPath = 'pdfjs/pdf.min.js';
+  const localWorker = 'pdfjs/pdf.worker.min.js';
       const coreFiles = [localPath,
         `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.min.js`,
         `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.min.js`,
