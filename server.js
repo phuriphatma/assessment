@@ -5,14 +5,17 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-const port = parseInt(process.argv[2],10) || 8080;
+const port = parseInt(process.env.PORT || process.argv[2],10) || 8080;
+const host = process.env.HOST || '0.0.0.0';
 const root = __dirname;
 
 const MIME = {
   '.html':'text/html; charset=UTF-8',
   '.js':'application/javascript; charset=UTF-8',
   '.css':'text/css; charset=UTF-8',
+  '.mjs':'application/javascript; charset=UTF-8',
   '.json':'application/json; charset=UTF-8',
   '.pdf':'application/pdf',
   '.png':'image/png',
@@ -36,7 +39,21 @@ http.createServer((req,res)=>{
     res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control':'no-cache' });
     fs.createReadStream(filePath).pipe(res);
   });
-}).listen(port, ()=>{
-  console.log(`Static server running at http://localhost:${port}`);
+}).listen(port, host, ()=>{
+  const ifaces = os.networkInterfaces();
+  const addrs = [];
+  Object.values(ifaces).forEach(list=>{
+    (list||[]).forEach(iface=>{
+      if(iface.family === 'IPv4' && !iface.internal){ addrs.push(iface.address); }
+    });
+  });
+  console.log(`Static server running:`);
+  console.log(`  • http://localhost:${port}`);
+  addrs.forEach(ip=> console.log(`  • http://${ip}:${port}`));
+  // Bonjour/mDNS hostname (may work on iPad via .local)
+  try {
+    const hn = os.hostname();
+    if(hn) console.log(`  • http://${hn}.local:${port}`);
+  } catch(_){}
   console.log('Press Ctrl+C to stop.');
 });

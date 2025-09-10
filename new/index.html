@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Growth Chart Plotter</title>
+<style>
+  #pdfContainer { position: relative; }
+  canvas { border: 1px solid #ccc; }
+  #plotCanvas { position: absolute; left: 0; top: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<h2>Growth Chart Plotter</h2>
+<input type="number" id="age" placeholder="Age (years)" step="0.1">
+<input type="number" id="weight" placeholder="Weight (kg)" step="0.1">
+<button onclick="plot()">Plot</button>
+
+<div id="pdfContainer">
+  <canvas id="pdfCanvas"></canvas>
+  <canvas id="plotCanvas"></canvas>
+</div>
+
+<div id="pdfStatus" style="margin:8px 0;color:#b00;font-weight:600;"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.313/pdf.min.js"></script>
+
+<script>
+const url = 'growth.pdf'; // your PDF file here
+
+const pdfCanvas = document.getElementById('pdfCanvas');
+const plotCanvas = document.getElementById('plotCanvas');
+const pdfCtx = pdfCanvas.getContext('2d');
+const plotCtx = plotCanvas.getContext('2d');
+
+let pdfDoc = null;
+let pdfReady = false;
+
+// Fix for PDF.js CDN usage
+const pdfjsLib = window['pdfjsLib'] || window.pdfjsLib;
+if (pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.313/pdf.worker.min.js';
+}
+
+pdfjsLib.getDocument(url).promise.then(pdf => {
+  pdfDoc = pdf;
+  return pdf.getPage(1);
+}).then(page => {
+  const viewport = page.getViewport({ scale: 1.5 });
+  pdfCanvas.width = viewport.width;
+  pdfCanvas.height = viewport.height;
+  plotCanvas.width = viewport.width;
+  plotCanvas.height = viewport.height;
+
+  const renderCtx = { canvasContext: pdfCtx, viewport: viewport };
+  return page.render(renderCtx).promise;
+}).then(() => {
+  pdfReady = true;
+  setStatus('PDF loaded. You can plot points.');
+}).catch(err => {
+  console.error('PDF load/render error:', err);
+  setStatus('Failed to load PDF: ' + err.message);
+});
+
+function setStatus(msg, ok=false) {
+  const el = document.getElementById('pdfStatus');
+  if (!el) return;
+  el.style.color = ok ? '#064' : '#b00';
+  el.textContent = msg;
+}
+
+if (location.protocol === 'file:') {
+  setStatus('Opened via file://. Start a local server (e.g. python3 -m http.server) then visit http://localhost:8000/ to avoid PDF loading being blocked.');
+}
+
+// Map real value → pixel (adjust according to your PDF)
+function mapX(value) { // age axis
+    const minVal = 2, maxVal = 19;
+    const minPixel = 60, maxPixel = pdfCanvas.width - 60;
+    return minPixel + (value - minVal)/(maxVal - minVal)*(maxPixel - minPixel);
+}
+
+function mapY(value) { // weight axis
+    const minVal = 10, maxVal = 90;
+    const minPixel = pdfCanvas.height - 60, maxPixel = 60; // invert y
+    return minPixel + (maxPixel - minPixel)*(value - minVal)/(maxVal - minVal);
+}
+
+function plot() {
+  if (!pdfReady) {
+    setStatus('PDF not ready yet. Wait until it finishes loading.');
+    return;
+  }
+    const age = parseFloat(document.getElementById('age').value);
+    const weight = parseFloat(document.getElementById('weight').value);
+
+  if (isNaN(age) || isNaN(weight)) {
+    setStatus('Enter both age and weight numbers.');
+    return;
+  }
+
+    const x = mapX(age);
+    const y = mapY(weight);
+
+    plotCtx.beginPath();
+    plotCtx.arc(x, y, 5, 0, 2*Math.PI);
+    plotCtx.fillStyle = 'red';
+    plotCtx.fill();
+  setStatus('Point plotted at age ' + age + ', weight ' + weight + '.', true);
+}
+</script>
+</body>
+</html>

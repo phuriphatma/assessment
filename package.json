@@ -9,6 +9,7 @@
     "serve": "node server.js",
     "start": "node server.js",
     "build": "echo 'Static site – no build step'",
+  "postinstall": "node scripts/postinstall.js",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d ."
   },

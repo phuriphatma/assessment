@@ -22,6 +22,14 @@ Option B (GitHub Pages): Push this repo to GitHub with a default branch named `m
    - A notice will confirm calibration saved.
 4. Enter child data and press "Plot Points". Points appear; table shows z-scores/percentiles (demo subset).
 
+### View from your phone/iPad on the same network
+1. Start the server:
+   - macOS/Linux: `node server.js 8080`
+2. Note the LAN URL printed (e.g. `http://192.168.1.23:8080`).
+3. On your iPad/iPhone, connect to the same Wi‑Fi and open that URL in Safari/Chrome.
+   - If it doesn’t load, try the mDNS address also printed (e.g. `http://your-mac.local:8080`).
+   - Keep your computer awake and on the same network.
+
 ## Extending LMS Data
 Edit `lmsData.js`:
 - Add full arrays for each metric/sex with entries `{ x: <ageMonths or stature cm>, L, M, S }` in ascending x.

@@ -55,6 +55,21 @@
       attempt();
     }
     loadLocal().then(()=>{ if(!loaded) loadCdn(); });
+    // Inline ultra-minimal fallback (only getDocument via dynamic import of CDN ESM) if everything fails
+    window.addEventListener('DOMContentLoaded', ()=>{
+      setTimeout(async ()=>{
+        if(!loaded && !window.pdfjsLib){
+          try {
+            const esm = await import(`https://unpkg.com/pdfjs-dist@${version}/build/pdf.mjs`);
+            if(esm && esm.getDocument){
+              window.pdfjsLib = esm;
+              if(!esm.GlobalWorkerOptions) esm.GlobalWorkerOptions = { workerSrc: `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.mjs` }; else esm.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.mjs`;
+              const fail = document.getElementById('pdfjs-fail'); if(fail) fail.innerHTML = 'CDN ESM fallback loaded.';
+            }
+          } catch(e){ /* final fallback failed */ }
+        }
+      }, 1800);
+    });
   </script>
 </head>
 <body>
@@ -62,6 +77,7 @@
     <h1>Growth Chart Plotter</h1>
     <p class="tagline">Overlay a child's anthropometric measurements on CDC/WHO PDF growth charts (local).</p>
   <div id="pdfjs-fail" class="notice hidden" style="margin-top:4px">pdf.js failed to load. Open <code>/pdfjs/pdf.mjs</code> directly to verify it exists. If 404, ensure GitHub Pages workflow copied ESM files. Otherwise a CDN may be blocked.</div>
+  <noscript><div class="notice">Enable JavaScript to use this tool.</div></noscript>
   </header>
 
   <main>
@@ -95,6 +111,10 @@
           <button type="submit" class="primary">Plot Points</button>
           <button type="button" id="clearPoints">Clear Points</button>
           <button type="button" id="enterCalibrateMode">Calibrate Axes</button>
+          <label style="display:inline-flex;align-items:center;gap:6px;margin-left:auto">
+            <input type="checkbox" id="toggleHighlightCV" checked /> Highlight CV scan
+          </label>
+          <button type="button" id="scanNow">Scan now</button>
         </div>
       </form>
       <details class="help">
@@ -124,10 +144,18 @@
       <h2>Results</h2>
       <table id="resultsTable">
         <thead>
-          <tr><th>Metric</th><th>Value</th><th>Age (months)</th><th>Percentile</th><th>Z</th><th>Chart</th></tr>
+          <tr><th>Metric</th><th>Value</th><th>Age (months)</th><th>Percentile</th><th>Z</th><th>Band (CV)</th><th>Chart</th></tr>
         </thead>
         <tbody></tbody>
       </table>
+      <details open style="margin-top:8px">
+        <summary>CV log</summary>
+        <div style="display:flex;gap:8px;align-items:center;margin:.25rem 0">
+          <button type="button" id="cvLogClear">Clear log</button>
+          <small style="color:#7d8590">Shows the last scans: x position, detected lines, labels, and result.</small>
+        </div>
+        <pre id="cvLog" style="background:#0d1117;border:1px solid #30363d;border-radius:4px;max-height:200px;overflow:auto;padding:6px;margin:0"></pre>
+      </details>
     </section>
   </main>
 

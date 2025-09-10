@@ -22,11 +22,21 @@ jobs:
           node-version: 20
       - name: Install pdf.js
         run: |
-          npm install pdfjs-dist@4.2.67 --no-audit --no-fund
-          mkdir -p pdfjs
-          # Copy ESM builds (referenced directly in index.html)
-          cp node_modules/pdfjs-dist/build/pdf.mjs pdfjs/
-          cp node_modules/pdfjs-dist/build/pdf.worker.mjs pdfjs/
+          echo "Node version:" && node -v
+          echo "Using existing package.json:" && cat package.json
+          npm install --no-audit --no-fund
+          # Postinstall should have created pdfjs/; force-create & copy if missing
+          if [ ! -d pdfjs ]; then mkdir -p pdfjs; fi
+          if [ ! -f pdfjs/pdf.mjs ]; then
+            echo "Manual copy fallback for pdfjs-dist assets";
+            cp node_modules/pdfjs-dist/build/pdf.mjs pdfjs/ 2>/dev/null || true
+            cp node_modules/pdfjs-dist/build/pdf.worker.mjs pdfjs/ 2>/dev/null || true
+            cp node_modules/pdfjs-dist/build/pdf.js pdfjs/ 2>/dev/null || true
+            cp node_modules/pdfjs-dist/build/pdf.worker.js pdfjs/ 2>/dev/null || true
+            cp node_modules/pdfjs-dist/build/pdf.min.js pdfjs/ 2>/dev/null || true
+            cp node_modules/pdfjs-dist/build/pdf.worker.min.js pdfjs/ 2>/dev/null || true
+          fi
+          echo "Listing pdfjs directory:"; ls -l pdfjs || true
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
