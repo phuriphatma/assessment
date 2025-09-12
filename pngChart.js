@@ -4,6 +4,28 @@
     'Weight-and-height_Boys_2-19-years.pdf': 'Weight-and-height_Boys_2-19-years.png'
   };
 
+  // Copy any existing calibrations from PDF key to PNG key (one-time per session)
+  try {
+    const migratedFlag = 'png_migration_done';
+    if(!localStorage.getItem(migratedFlag)){
+      Object.keys(PNG_ALIAS).forEach(oldFile=>{
+        const newFile = PNG_ALIAS[oldFile];
+        ['weightForAge','statureForAge'].forEach(metric=>{
+          ['boys','girls'].forEach(sex=>{
+            const oldKey = 'calib_'+metric+'_'+sex+'_'+oldFile;
+            const newKey = 'calib_'+metric+'_'+sex+'_'+newFile;
+            const val = localStorage.getItem(oldKey);
+            if(val && !localStorage.getItem(newKey)){
+              localStorage.setItem(newKey, val);
+              console.log('[PNG Migration] copied calibration', oldKey,'->',newKey);
+            }
+          });
+        });
+      });
+      localStorage.setItem(migratedFlag,'1');
+    }
+  } catch(_){}
+
   function calibKey(metric, sex, file){
     return 'calib_'+metric+'_'+sex+'_'+file;
   }

@@ -6,8 +6,8 @@ const PDF_FILES = {
     headCircumference: 'Head-circumference_Boys.pdf',
     weightForAge_under2: 'Weight-and-length_Boys_0-2-years.pdf',
     statureForAge_under2: 'Weight-and-length_Boys_0-2-years.pdf',
-    weightForAge_2to19: 'Weight-and-height_Boys_2-19-years.pdf',
-    statureForAge_2to19: 'Weight-and-height_Boys_2-19-years.pdf',
+  weightForAge_2to19: 'Weight-and-height_Boys_2-19-years.png',
+  statureForAge_2to19: 'Weight-and-height_Boys_2-19-years.png',
     weightForStature: 'Weight-for-height_Boys.pdf'
   },
   girls: {
